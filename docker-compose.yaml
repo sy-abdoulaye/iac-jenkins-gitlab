@@ -1,0 +1,78 @@
+version: '3.8'
+
+
+services:
+  jenkins_container_asmag:
+    env_file:
+      - ./env/env.env
+    build:
+      context: ./utils/images/jenkins
+      dockerfile: Dockerfile
+      args:
+        VERSION: $VERSION
+        PLUGINS_FILE: $PLUGINS_FILE
+    image: $JENKINS_IMAGE
+    container_name: jenkins_container_asmag
+    restart: always
+    privileged: true
+    ports:
+      - 0.0.0.0:$SSH_PORT:22
+      - 0.0.0.0:$HTTP_PORT:8080
+      - 0.0.0.0:$JENKINS_PORT:50000
+    volumes:
+      - ./volumes/jenkins/jenkins_home:/var/jenkins_home
+    networks:
+      network_asmag:
+        ipv4_address: $JENKINS_ASMAG_ADDRESS
+
+  web:
+    env_file:
+      - ./env/env.env
+    build:
+      args:
+          GITLAB_VERSION: $GITLAB_VERSION
+          GITLAB_OMNIBUS_CONFIG: |
+            external_url '$GITLAB_EXTERNAL_URL'
+      context: ./utils/images/gitlab/web
+      dockerfile: Dockerfile
+    image: $GITLAB_WEB_IMAGE
+    container_name: gitlab_container_asmag
+    restart: always
+    privileged: true
+    ports:
+      - 0.0.0.0:$GITLAB_SSH_PORT:22
+      - 0.0.0.0:$GITLAB_HTTP_PORT:80
+      - 0.0.0.0:$GITLAB_HTTPS_PORT:443
+    volumes:
+      - "./volumes/gitlab/web/config:/etc/gitlab"
+      - "./volumes/gitlab/web/logs:/var/log/gitlab"
+      - "./volumes/gitlab/web/data:/var/opt/gitlab"
+    networks:
+      network_asmag:
+        ipv4_address: $GITLAB_ASMAG_ADDRESS
+
+  gitlab-runner:
+    env_file:
+      - ./env/env.env
+    build:
+      context: ./utils/images/gitlab/gitlab-runner
+      dockerfile: Dockerfile
+    image: $GITLAB_RUNNER_IMAGE
+    container_name: gitlab-runner
+    restart: always
+    privileged: true
+    depends_on:
+      - web
+    volumes:
+      - "./volumes/gitlab/gitlab-runner/docker.sock:/var/run/docker.sock"
+      - "./volumes/gitlab/gitlab-runner:/etc/gitlab-runner"
+    networks:
+      network_asmag:
+        ipv4_address: $GITLAB_RUNNER_ASMAG_ADDRESS
+
+
+
+
+networks:
+  network_asmag:
+    external: true
